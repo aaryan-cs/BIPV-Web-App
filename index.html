@@ -25,27 +25,33 @@
     <div id="toolbar"></div>
 
     <script type="text/javascript">
-        // Grant CesiumJS access to your ion assets
         Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjOTc1MmQzYS03M2RlLTRiZDctOWJjMy0yYTRiYzg5NDA0ZmUiLCJpZCI6MjYxNTY5LCJpYXQiOjE3MzM4ODk2MzJ9.hoTiuf8NBspTIAlnbUVfmuKnl4RW8BMcZQhCu1SAz88";
+    
         const viewer = new Cesium.Viewer("cesiumContainer");
-
+        let isHeatmapApplied = false; // Track the state of heatmap application
+    
         async function loadAhmedabadGeoJSON() {
             try {
                 const dataSource = await Cesium.GeoJsonDataSource.load("New_Ahmedabad.geojson");
                 viewer.dataSources.add(dataSource);
-
+    
                 const entities = dataSource.entities.values;
+    
+                // Set default material for buildings
                 entities.forEach(entity => {
                     if (entity.polygon) {
                         const height = entity.properties.height || 0; // Use the "height" property if available
                         entity.polygon.extrudedHeight = parseFloat(height);
-                        entity.polygon.material = Cesium.Color.YELLOW;
+                        entity.polygon.material = Cesium.Color.YELLOW; // Default color
                         entity.polygon.outline = false;
+    
+                        // Store the default material for toggling back later
+                        entity.polygon.defaultMaterial = Cesium.Color.YELLOW;
                     }
                 });
-
+    
                 viewer.zoomTo(dataSource);
-
+    
                 // Set up a click handler
                 const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
                 handler.setInputAction(function (click) {
@@ -54,7 +60,7 @@
                         const buildingId = pickedObject.id.properties.building_id || "N/A";
                         const faceId = pickedObject.id.properties.face_id || "N/A";
                         const bipvPotential = pickedObject.id.properties.bipv_potential || "N/A";
-
+    
                         // Format the description for the info box
                         const description = `
                             <table class="cesium-infoBox-defaultTable">
@@ -74,31 +80,56 @@
                                 </tbody>
                             </table>
                         `;
-
+    
                         // Assign the description to the picked entity
                         pickedObject.id.description = description;
-
+    
                         // Ensure the info box is displayed for the picked entity
                         viewer.selectedEntity = pickedObject.id;
                     }
                 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
+    
             } catch (error) {
                 console.error("Error loading Ahmedabad GeoJSON:", error);
             }
         }
-
+    
         loadAhmedabadGeoJSON();
-
-        Sandcastle.addToolbarMenu([
-            {
-                text: "Remove All",
-                onselect: function () {
-                    viewer.dataSources.removeAll();
-                },
-            },
-        ], "toolbar");
+    
+        // Function to toggle heatmap textures
+        function applyHeatmap() {
+            const dataSource = viewer.dataSources.get(0); // Assuming the first data source is the GeoJSON
+            if (!dataSource) return;
+    
+            const entities = dataSource.entities.values;
+    
+            if (isHeatmapApplied) {
+                // Revert to default material
+                entities.forEach(entity => {
+                    if (entity.polygon) {
+                        entity.polygon.material = entity.polygon.defaultMaterial; // Restore the default material
+                    }
+                });
+                isHeatmapApplied = false;
+            } else {
+                // Apply heatmap texture
+                entities.forEach(entity => {
+                    if (entity.polygon) {
+                        entity.polygon.material = new Cesium.ImageMaterialProperty({
+                            image: "heatmap.jpg", // Replace with your heatmap texture URL
+                            transparent: true, // Ensure transparency if needed
+                        });
+                    }
+                });
+                isHeatmapApplied = true;
+            }
+        }
+    
+        // Add a button to toggle heatmap display
+        Sandcastle.addToolbarButton("Solar Potential Heatmap", applyHeatmap);
     </script>
+    
+    
 </body>
 
 </html>
