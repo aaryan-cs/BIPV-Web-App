@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+
+    <script src="http://localhost:8082/3d/libs/Cesium-1.81/Build/Cesium/Cesium.js"></script>
+    <script src="http://localhost:8082/3d/libs/Cesium-1.81/Apps/Sandcastle/Sandcastle-header.js"></script>
+
+    <title>Cesium Viewer</title>
+</head>
+
+<style>
+    @import url(http://localhost:8082/3d/libs/Cesium-1.81/Apps/Sandcastle/CesiumSandcastle.css);
+    @import url(http://localhost:8082/3d/libs/Cesium-1.81/Apps/Sandcastle/templates/bucket.css);
+</style>
+
+<body>
+    <div id="cesiumContainer" class="fullSize"></div>
+    <div id="loadingOverlay">
+        <h1>Loading...</h1>
+    </div>
+    <div id="toolbar"></div>
+
+    <script type="text/javascript">
+        // Grant CesiumJS access to your ion assets
+        Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjOTc1MmQzYS03M2RlLTRiZDctOWJjMy0yYTRiYzg5NDA0ZmUiLCJpZCI6MjYxNTY5LCJpYXQiOjE3MzM4ODk2MzJ9.hoTiuf8NBspTIAlnbUVfmuKnl4RW8BMcZQhCu1SAz88";
+        const viewer = new Cesium.Viewer("cesiumContainer");
+
+        async function loadAhmedabadGeoJSON() {
+            try {
+                const dataSource = await Cesium.GeoJsonDataSource.load("New_Ahmedabad.geojson");
+                viewer.dataSources.add(dataSource);
+
+                const entities = dataSource.entities.values;
+                entities.forEach(entity => {
+                    if (entity.polygon) {
+                        const height = entity.properties.height || 0; // Use the "height" property if available
+                        entity.polygon.extrudedHeight = parseFloat(height);
+                        entity.polygon.material = Cesium.Color.YELLOW;
+                        entity.polygon.outline = false;
+                    }
+                });
+
+                viewer.zoomTo(dataSource);
+
+                // Set up a click handler
+                const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+                handler.setInputAction(function (click) {
+                    const pickedObject = viewer.scene.pick(click.position);
+                    if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
+                        const buildingId = pickedObject.id.properties.building_id || "N/A";
+                        const faceId = pickedObject.id.properties.face_id || "N/A";
+                        const bipvPotential = pickedObject.id.properties.bipv_potential || "N/A";
+
+                        // Format the description for the info box
+                        const description = `
+                            <table class="cesium-infoBox-defaultTable">
+                                <tbody>
+                                    <tr>
+                                        <th>Building ID</th>
+                                        <td>${buildingId}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Face ID</th>
+                                        <td>${faceId}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>BIPV Potential</th>
+                                        <td>${bipvPotential}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        `;
+
+                        // Assign the description to the picked entity
+                        pickedObject.id.description = description;
+
+                        // Ensure the info box is displayed for the picked entity
+                        viewer.selectedEntity = pickedObject.id;
+                    }
+                }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+            } catch (error) {
+                console.error("Error loading Ahmedabad GeoJSON:", error);
+            }
+        }
+
+        loadAhmedabadGeoJSON();
+
+        Sandcastle.addToolbarMenu([
+            {
+                text: "Remove All",
+                onselect: function () {
+                    viewer.dataSources.removeAll();
+                },
+            },
+        ], "toolbar");
+    </script>
+</body>
+
+</html>
